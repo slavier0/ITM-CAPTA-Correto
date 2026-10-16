@@ -1,76 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
-import { supabase, isSupabaseConfigured } from './supabase'
-import { Search, RefreshCw, ExternalLink, CalendarDays, Target, Wallet, FileSearch, ShieldCheck, Plus, X, Menu, AlertCircle, CheckCircle2, Clock3 } from 'lucide-react'
-
-const categories = {
-  hub_infrastructure: 'Infraestrutura do Hub',
-  creative_territorial: 'Economia criativa e território',
-  innovation_entrepreneurship: 'Inovação e empreendedorismo',
-  summit_events: 'Taquara Summit e eventos',
-  transversal: 'Transversal'
-}
-const statuses = {
-  open_confirmed: 'Aberto confirmado',
-  announced_not_open: 'Anunciado, ainda não aberto',
-  historical_forecast: 'Previsão histórica',
-  closed: 'Encerrado',
-  suspended: 'Suspenso',
-  needs_verification: 'Precisa verificar'
-}
-const money = value => value == null ? 'Não informado' : Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
-const date = value => value ? new Date(value).toLocaleDateString('pt-BR') : 'Sem prazo informado'
-
-export default function App() {
-  const [tab, setTab] = useState('overview')
-  const [opportunities, setOpportunities] = useState([])
-  const [sources, setSources] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [form, setForm] = useState({ title:'', funder:'', official_url:'', regulation_url:'', category:'transversal', status:'needs_verification', deadline_at:'', amount_per_project_max:'', next_action:'' })
-
-  async function loadData() {
-    if (!isSupabaseConfigured) return
-    setLoading(true); setError('')
-    try {
-      const [op, src] = await Promise.all([
-        supabase.from('opportunities').select('id,title,funder,official_url,regulation_url,category,status,deadline_at,amount_per_project_min,amount_per_project_max,strategic_fit_score,eligibility_status,financial_viability_status,next_action,last_verified_at,created_at').order('created_at', { ascending: false }).limit(500),
-        supabase.from('funding_sources').select('id,name,base_url,source_type,level,is_active,last_checked_at,last_check_status').order('name')
-      ])
-      if (op.error) throw op.error
-      if (src.error) throw src.error
-      setOpportunities(op.data || []); setSources(src.data || [])
-    } catch (e) { setError(e.message || 'Não foi possível carregar os dados.') }
-    finally { setLoading(false) }
-  }
-  useEffect(() => { loadData() }, [])
-
-  const filtered = useMemo(() => opportunities.filter(o => {
-    const text = `${o.title || ''} ${o.funder || ''} ${categories[o.category] || ''}`.toLowerCase()
-    return text.includes(query.toLowerCase()) && (statusFilter === 'all' || o.status === statusFilter)
-  }), [opportunities, query, statusFilter])
-
-  const openCount = opportunities.filter(o => o.status === 'open_confirmed').length
-  const verificationCount = opportunities.filter(o => o.status === 'needs_verification').length
-  const dueCount = opportunities.filter(o => o.deadline_at && new Date(o.deadline_at) >= new Date() && (new Date(o.deadline_at) - new Date()) < 30*86400000).length
-
-  async function saveOpportunity(e) {
-    e.preventDefault()
-    if (!isSupabaseConfigured) { setNotice('Configure as variáveis do Supabase para gravar dados.'); return }
-    setSaving(true); setNotice('')
-    try {
-      const payload = { ...form, amount_per_project_max: form.amount_per_project_max ? Number(form.amount_per_project_max) : null, deadline_at: form.deadline_at || null, is_demo: false }
-      const { error: saveError } = await supabase.from('opportunities').insert(payload)
-      if (saveError) throw saveError
-      setShowForm(false); setForm({ title:'', funder:'', official_url:'', regulation_url:'', category:'transversal', status:'needs_verification', deadline_at:'', amount_per_project_max:'', next_action:'' })
-      setNotice('Oportunidade registrada. Confirme os dados na fonte oficial antes de classificá-la como aberta.')
-      await loadData()
-    } catch (e) { setNotice(`Não foi possível salvar: ${e.message}`) }
-    finally { setSaving(false) }
+    return <div style={loginPageStyle}>
+      <form onSubmit={handleSignIn} style={loginCardStyle}>
+        <div style={loginMarkStyle}>ITM</div>
+        <p style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1.5, margin: '0 0 8px' }}>INSTITUTO TAQUARA MAIS</p>
+        <h1 style={{ margin: '0 0 8px', fontSize: 28, color: '#172033' }}>Entrar no ITM Capta</h1>
+        <p style={{ color: '#64748b', lineHeight: 1.55, margin: '0 0 24px' }}>Acesse com o e-mail e a senha fornecidos pelo administrador.</p>
+        {authError && <div role="alert" style={authAlertStyle}>{authError}</div>}
+        {authMessage && <div role="status" style={{ ...authAlertStyle, background: '#ecfdf5', color: '#065f46' }}>{authMessage}</div>}
+        <label style={loginLabelStyle}>E-mail
+          <input type="email" autoComplete="username" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="voce@instituicao.org.br" style={loginInputStyle} />
+        </label>
+        <label style={loginLabelStyle}>Senha
+          <input type="password" autoComplete="current-password" required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="Sua senha" style={loginInputStyle} />
+        </label>
+        <button type="submit" disabled={authBusy} style={loginButtonStyle}>{authBusy ? 'Entrando...' : 'Entrar com segurança'}</button>
+        <p style={{ color: '#64748b', fontSize: 12, lineHeight: 1.5, margin: '18px 0 0' }}>O cadastro público está desativado. Somente contas criadas pelo administrador podem acessar o sistema.</p>
+      </form>
+    </div>
   }
 
   return <div className="app-shell">
@@ -86,7 +31,7 @@ export default function App() {
       <div className="sidebar-footer">ITM CAPTA <span>•</span> VERSÃO INICIAL</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Instituto Taquara Mais <span>/</span> {tab==='overview'?'Visão geral':tab==='opportunities'?'Oportunidades':'Fontes de recursos'}</div><div className="top-actions"><span className={`connection ${isSupabaseConfigured?'connected':'disconnected'}`}><i></i>{isSupabaseConfigured?'Banco configurado':'Banco não configurado'}</span><button className="icon-btn" title="Atualizar dados" onClick={loadData}><RefreshCw size={17} className={loading?'spin':''}/></button></div></header>
+      <header className="topbar"><div className="breadcrumb">Instituto Taquara Mais <span>/</span> {tab==='overview'?'Visão geral':tab==='opportunities'?'Oportunidades':'Fontes de recursos'}</div><div className="top-actions"><span className={`connection ${isSupabaseConfigured?'connected':'disconnected'}`}><i></i>{isSupabaseConfigured?'Banco configurado':'Banco não configurado'}</span><button className="icon-btn" title="Atualizar dados" onClick={loadData}><RefreshCw size={17} className={loading?'spin':''}/></button><button className="secondary" onClick={handleSignOut} style={{ marginLeft: 8 }}>Sair</button></div></header>
       <section className="page-content">
         {tab==='overview' && <>
           <div className="page-heading"><div><p className="eyebrow">RADAR DE CAPTAÇÃO</p><h1>Encontre recursos para transformar ideias em projetos.</h1><p className="subheading">Centralize editais, avalie aderência institucional e acompanhe prazos importantes.</p></div><button className="primary" onClick={()=>{setTab('opportunities');setShowForm(true)}}><Plus size={18}/> Nova oportunidade</button></div>
@@ -123,6 +68,35 @@ export default function App() {
     </main>
     {showForm && <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setShowForm(false)}}><div className="modal"><div className="modal-head"><div><p className="eyebrow">REGISTRO MANUAL</p><h2>Nova oportunidade</h2></div><button className="icon-btn" onClick={()=>setShowForm(false)}><X/></button></div><form onSubmit={saveOpportunity}><label>Título do edital ou oportunidade *<input required value={form.title} onChange={e=>setForm({...form,title:e.target.value})} /></label><label>Instituição financiadora *<input required value={form.funder} onChange={e=>setForm({...form,funder:e.target.value})} /></label><label>Link da fonte oficial *<input required type="url" placeholder="https://" value={form.official_url} onChange={e=>setForm({...form,official_url:e.target.value})} /></label><label>Link do regulamento<input type="url" placeholder="https://" value={form.regulation_url} onChange={e=>setForm({...form,regulation_url:e.target.value})} /></label><div className="form-row"><label>Categoria<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{Object.entries(categories).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label>Status inicial<select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(statuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div><div className="form-row"><label>Prazo final<input type="date" value={form.deadline_at} onChange={e=>setForm({...form,deadline_at:e.target.value})}/></label><label>Valor máximo por projeto (R$)<input type="number" min="0" value={form.amount_per_project_max} onChange={e=>setForm({...form,amount_per_project_max:e.target.value})}/></label></div><label>Próxima ação recomendada<textarea rows="2" value={form.next_action} onChange={e=>setForm({...form,next_action:e.target.value})}/></label><div className="form-note"><AlertCircle size={16}/> O registro manual não substitui a validação do regulamento e da elegibilidade do ITM.</div><div className="modal-actions"><button type="button" className="secondary" onClick={()=>setShowForm(false)}>Cancelar</button><button className="primary" disabled={saving}>{saving?'Salvando...':'Salvar oportunidade'}</button></div></form></div></div>}
   </div>
+}
+
+const loginPageStyle = {
+  minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: 24, background: 'linear-gradient(135deg, #f3f6fb 0%, #e8eef7 100%)',
+  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+}
+const loginCardStyle = {
+  width: '100%', maxWidth: 430, boxSizing: 'border-box', background: '#fff',
+  border: '1px solid #e2e8f0', borderRadius: 20, padding: '36px 32px',
+  boxShadow: '0 20px 60px rgba(15, 23, 42, 0.10)'
+}
+const loginMarkStyle = {
+  width: 54, height: 54, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  borderRadius: 15, background: '#173b68', color: '#fff', fontWeight: 800,
+  letterSpacing: 1, marginBottom: 24
+}
+const loginLabelStyle = { display: 'block', color: '#334155', fontSize: 13, fontWeight: 650, marginBottom: 16 }
+const loginInputStyle = {
+  display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 8, padding: '12px 13px',
+  border: '1px solid #cbd5e1', borderRadius: 9, fontSize: 15, outlineColor: '#315f91'
+}
+const loginButtonStyle = {
+  width: '100%', marginTop: 6, padding: '13px 16px', border: 0, borderRadius: 9,
+  background: '#173b68', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer'
+}
+const authAlertStyle = {
+  background: '#fef2f2', color: '#991b1b', borderRadius: 9, padding: 12,
+  fontSize: 13, lineHeight: 1.5, marginBottom: 16
 }
 
 function Metric({icon,label,value,note}) { return <div className="metric"><div className="metric-top"><span className="metric-icon">{icon}</span><span className="metric-kicker">ITM CAPTA</span></div><strong>{value}</strong><span className="metric-label">{label}</span><small>{note}</small></div> }
